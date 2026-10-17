@@ -27,7 +27,10 @@ npm install
 npm run dev      # http://localhost:5173 (also reachable from the phone on the same Wi-Fi)
 npm test         # stats engine checks against data/hevy-export.json when present
 npm run build    # static site in dist/
+npm run deploy   # test + build + publish dist/ to the gh-pages branch → https://eezyinglis.github.io/lait/
 ```
+The repo is public (needed for free GitHub Pages). Personal data never goes in it: `/data/`, `/research/`,
+`/HEVY_BREAKDOWN.md` and `tests/private/` (tests against your real export) are git-ignored.
 
 ## Layout
 - `src/lib/stats.ts`: 1RM (Hevy's %-table), volume, PR detection and history index. Pure and unit-tested.
@@ -35,5 +38,5 @@ npm run build    # static site in dist/
 - `src/lib/actions.ts`: start/finish workouts, routines, import/export.
 - `src/screens/*`: Home feed, Logger, Routines, Exercises, Profile, Settings.
 - `public/sw.js`: offline cache. `scripts/make-icons.mjs` regenerates PNG icons.
-- `data/` (git-ignored): your personal export. `research/` (git-ignored): Hevy analysis material.
-- `HEVY_BREAKDOWN.md`: the reverse-engineering notes this app is based on.
+- `data/`, `research/` (git-ignored): your personal export and the Hevy analysis material.
+- `HEVY_BREAKDOWN.md` (git-ignored, local only): the reverse-engineering notes this app is based on.
