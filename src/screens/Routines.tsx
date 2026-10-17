@@ -70,7 +70,10 @@ export function Routines() {
             <div className="rcard-title">{r.title}</div>
             <div className="muted small clamp2">{r.exercises.map(e => exercises.get(e.exId)?.title ?? '?').join(', ') || 'No exercises'}</div>
           </button>
-          <button className="btn primary full" disabled={!!active || r.exercises.length === 0} onClick={() => setStarting(r)}>Start routine</button>
+          <div className="row gap rcard-actions">
+            <button className="btn ghost" onClick={() => go(`/routine/${r.id}`)}><Icon name="edit" size={16} /> Edit</button>
+            <button className="btn primary grow" disabled={!!active || r.exercises.length === 0} onClick={() => setStarting(r)}>Start routine</button>
+          </div>
         </div>
       ))}
       <StartSheet routine={starting} onClose={() => setStarting(null)} />
@@ -83,20 +86,39 @@ export function RoutineEditor({ id }: { id: string }) {
   const stored = routines.find(r => r.id === id);
   const [r, setR] = useState<Routine | null>(stored ?? null);
   const [dirty, setDirty] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
   const [picker, setPicker] = useState(false);
   const [menu, setMenu] = useState(false);
   const [starting, setStarting] = useState<Routine | null>(null);
   useEffect(() => { if (stored && !r) setR(stored); }, [stored]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!r) return <div className="screen"><Header title="Routine" onBack /><Empty>{ready ? 'Routine not found.' : 'Loading…'}</Empty></div>;
-  const edit = (next: Routine) => { setR(next); setDirty(true); };
+  if (!r) return <div className="screen"><Header title="Edit routine" onBack /><Empty>{ready ? 'Routine not found.' : 'Loading…'}</Empty></div>;
+  const edit = (next: Routine) => { setR(next); setDirty(true); setSavedFlash(false); };
   const ops = listOps(r.exercises, exs => edit({ ...r, exercises: exs }));
   const labels = supersetLabels(r.exercises);
-  const save = async () => { await saveRoutine(r); setDirty(false); };
+  const save = async () => {
+    await saveRoutine({ ...r, title: r.title.trim() || 'Routine' });
+    setDirty(false);
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 1500);
+  };
+  const idx = routines.findIndex(x => x.id === r.id);
+  /** Swaps this routine with its neighbour in the list. */
+  const moveRoutine = async (d: -1 | 1) => {
+    const other = routines[idx + d];
+    if (!other) return;
+    await db.transaction('rw', db.routines, async () => {
+      await db.routines.update(r.id, { order: other.order });
+      await db.routines.update(other.id, { order: r.order });
+    });
+    setR({ ...r, order: other.order });
+  };
 
   return (
     <div className="screen">
-      <Header title="Routine" onBack={async () => { if (dirty) await save(); back('/routines'); }}
+      <Header title="Edit routine" sub={dirty ? 'Unsaved changes' : savedFlash ? 'Saved ✓' : 'Changes save when you leave'}
+        onBack={async () => { if (dirty) await save(); back('/routines'); }}
         right={<>
           {dirty && <button className="btn primary sm" onClick={save}>Save</button>}
           <button className="icon-btn" aria-label="Routine options" onClick={() => setMenu(true)}><Icon name="more" /></button>
@@ -121,12 +143,24 @@ export function RoutineEditor({ id }: { id: string }) {
       <StartSheet routine={starting} onClose={() => setStarting(null)} />
       <Sheet open={menu} onClose={() => setMenu(false)} title={r.title}>
         <div className="menu">
+          {dirty && stored && (
+            <button className="menu-i" onClick={() => { setR(stored); setDirty(false); setMenu(false); }}>↺ Discard unsaved changes</button>
+          )}
+          <button className="menu-i" disabled={idx <= 0} onClick={async () => { await moveRoutine(-1); setMenu(false); }}>↑ Move up in the list</button>
+          <button className="menu-i" disabled={idx < 0 || idx >= routines.length - 1} onClick={async () => { await moveRoutine(1); setMenu(false); }}>↓ Move down in the list</button>
           <button className="menu-i" onClick={async () => { await saveRoutine({ ...r, id: crypto.randomUUID(), title: r.title + ' (copy)', order: routines.length }); setMenu(false); go('/routines'); }}>
             Duplicate routine
           </button>
-          <button className="menu-i danger" onClick={async () => { await db.routines.delete(r.id); setMenu(false); go('/routines'); }}>
+          <button className="menu-i danger" onClick={() => { setMenu(false); setConfirmDel(true); }}>
             <Icon name="trash" size={18} /> Delete routine
           </button>
+        </div>
+      </Sheet>
+      <Sheet open={confirmDel} onClose={() => setConfirmDel(false)} title={`Delete “${r.title}”?`}>
+        <div className="menu">
+          <p className="muted pad">The routine is removed. Workouts you logged with it stay in your history.</p>
+          <button className="btn danger full" onClick={async () => { await db.routines.delete(r.id); setConfirmDel(false); go('/routines'); }}>Delete routine</button>
+          <button className="btn ghost full" onClick={() => setConfirmDel(false)}>Cancel</button>
         </div>
       </Sheet>
     </div>

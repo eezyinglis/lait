@@ -12,6 +12,7 @@ export type Route =
   | { name: 'report' }
   | { name: 'body' }
   | { name: 'workout'; id: string }
+  | { name: 'editWorkout'; id: string }
   | { name: 'exercise'; id: string }
   | { name: 'routine'; id: string }
   | { name: 'logger' };
@@ -28,6 +29,7 @@ export function parse(hash: string): Route {
     case 'report': return { name: 'report' };
     case 'body': return { name: 'body' };
     case 'workout': return b ? { name: 'workout', id: b } : { name: 'home' };
+    case 'edit': return b ? { name: 'editWorkout', id: b } : { name: 'home' };
     case 'exercise': return b ? { name: 'exercise', id: b } : { name: 'exercises' };
     case 'routine': return b ? { name: 'routine', id: b } : { name: 'routines' };
     case 'logger': return { name: 'logger' };

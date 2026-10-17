@@ -4,6 +4,7 @@ import { go, useRoute, type Route } from './router';
 import { clock } from './lib/format';
 import { Home } from './screens/Home';
 import { WorkoutDetail } from './screens/WorkoutDetail';
+import { EditWorkout } from './screens/EditWorkout';
 import { Logger } from './screens/Logger';
 import { RoutineEditor, Routines } from './screens/Routines';
 import { ExerciseDetail, Exercises } from './screens/Exercises';
@@ -27,6 +28,7 @@ function screen(r: Route) {
     case 'report': return <Report />;
     case 'body': return <Body />;
     case 'workout': return <WorkoutDetail id={r.id} />;
+    case 'editWorkout': return <EditWorkout id={r.id} />;
     case 'exercise': return <ExerciseDetail id={r.id} />;
     case 'routine': return <RoutineEditor id={r.id} />;
     case 'logger': return <Logger />;
@@ -60,7 +62,7 @@ export function App() {
   const route = useRoute();
   const inLogger = route.name === 'logger';
   const tabFor = (r: Route) =>
-    r.name === 'workout' ? 'home' : r.name === 'routine' ? 'routines' : r.name === 'exercise' ? 'exercises' : r.name === 'settings' || r.name === 'progress' || r.name === 'balance' || r.name === 'report' || r.name === 'body' ? 'profile' : r.name;
+    r.name === 'workout' || r.name === 'editWorkout' ? 'home' : r.name === 'routine' ? 'routines' : r.name === 'exercise' ? 'exercises' : r.name === 'settings' || r.name === 'progress' || r.name === 'balance' || r.name === 'report' || r.name === 'body' ? 'profile' : r.name;
   const current = tabFor(route);
   return (
     <div className={'app' + (inLogger ? ' in-logger' : '')}>

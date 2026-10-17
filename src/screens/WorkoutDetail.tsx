@@ -23,7 +23,10 @@ export function WorkoutDetail({ id }: { id: string }) {
 
   return (
     <div className="screen">
-      <Header title="Workout" onBack right={<button className="icon-btn" aria-label="Workout options" onClick={() => setMenu(true)}><Icon name="more" /></button>} />
+      <Header title="Workout" onBack right={<>
+        <button className="icon-btn" aria-label="Edit workout" onClick={() => go(`/edit/${w.id}`)}><Icon name="edit" /></button>
+        <button className="icon-btn" aria-label="Workout options" onClick={() => setMenu(true)}><Icon name="more" /></button>
+      </>} />
       <div className="detail-top">
         <h1>{w.name}</h1>
         <div className="muted">{fmtDate(w.start)} · {time}</div>
@@ -58,6 +61,9 @@ export function WorkoutDetail({ id }: { id: string }) {
 
       <Sheet open={menu} onClose={() => setMenu(false)} title={w.name}>
         <div className="menu">
+          <button className="menu-i" onClick={() => { setMenu(false); go(`/edit/${w.id}`); }}>
+            <Icon name="edit" size={18} /> Edit workout
+          </button>
           <button className="menu-i" disabled={!!active} onClick={async () => { await startWorkout({ from: w }); go('/logger'); }}>
             <Icon name="play" size={18} /> {active ? 'Finish your current workout first' : 'Repeat this workout'}
           </button>

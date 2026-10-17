@@ -72,6 +72,8 @@ interface Props {
   gymId?: string | null;
   /** Today's readiness score (1–5), if checked in. */
   readiness?: number | null;
+  /** Show the next-session suggestion strip (off when editing a past workout). */
+  showSuggestion?: boolean;
   onChange: (ex: WExercise) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
@@ -99,7 +101,7 @@ function SetRow({ children, onSwipe, className, style }: { children: React.React
   return <div className={className} style={style} {...swipe}>{children}</div>;
 }
 
-export function ExerciseCard({ ex, exercise, prefs, previous, mode, supersetLabel, gymId = null, readiness = null, onChange, onRemove, onMove, onToggleSuperset, onSetDone }: Props) {
+export function ExerciseCard({ ex, exercise, prefs, previous, mode, supersetLabel, gymId = null, readiness = null, showSuggestion = true, onChange, onRemove, onMove, onToggleSuperset, onSetDone }: Props) {
   const { history, machines, exercises } = useData();
   const t = exercise?.type ?? 'weight_reps';
   const [menu, setMenu] = useState(false);
@@ -205,7 +207,7 @@ export function ExerciseCard({ ex, exercise, prefs, previous, mode, supersetLabe
         <Icon name="timer" size={15} /> Rest: {rest ? clock(rest) : 'off'}
         {ex.uni ? ' per side (½)' : ex.rest == null ? ' (default)' : ''}
       </button>
-      {sugg && !allDone && <SuggestionStrip s={sugg} onApply={() => onChange(applyTargets(ex, sugg.sets))} />}
+      {showSuggestion && sugg && !allDone && <SuggestionStrip s={sugg} onApply={() => onChange(applyTargets(ex, sugg.sets))} />}
 
       <div className={'set-grid head ' + mode} style={gridStyle}>
         <span>SET</span>
