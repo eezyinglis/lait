@@ -1,6 +1,8 @@
-import { db, getActive, getCurrentGym, getPrefs, nowSec, setActive, uid } from '../db';
+import { db, getActive, getCurrentGym, getPrefs, nowSec, setActive, setCurrentGym, setPrefs, uid } from '../db';
 import type { ActiveWorkout, Routine, WExercise, WSet, Workout } from '../types';
 import { fromLaitFile, parseLaitFile, toLaitFile } from './importer';
+import { autoTune, nearestGym } from './training';
+import { getPosition } from './device';
 
 const blankSet = (): WSet => ({ type: 'normal', kg: null, reps: null, rpe: null, m: null, sec: null, done: false });
 
@@ -23,7 +25,27 @@ export async function startWorkout(opts: { routine?: Routine; from?: Workout; ex
     // readiness stays undefined until the check-in is answered (object) or skipped (null).
   };
   await setActive(a);
+  void autoPickGym(a.id, a.gymId ?? null);
   return true;
+}
+
+/**
+ * Picks the nearest saved gym from your location, in the background so starting is instant. Only applies while
+ * the workout still has the gym it started with and nothing is logged yet (a manual choice always wins).
+ */
+async function autoPickGym(workoutId: string, startedWith: string | null) {
+  const prefs = await getPrefs();
+  if (!prefs.autoGym) return;
+  const gyms = (await db.gyms.toArray()).filter(g => g.lat != null && g.lon != null);
+  if (!gyms.length) return;
+  const pos = await getPosition();
+  if (!pos) return;
+  const g = nearestGym(gyms, pos.lat, pos.lon);
+  if (!g || g.id === startedWith) return;
+  const cur = await getActive();
+  if (!cur || cur.id !== workoutId || (cur.gymId ?? null) !== startedWith || cur.exercises.some(e => e.sets.some(s => s.done))) return;
+  await setActive({ ...cur, gymId: g.id });
+  await setCurrentGym(g.id);
 }
 
 function workoutNameForNow() {
@@ -36,7 +58,7 @@ export const newSet = blankSet;
 /** A set counts as logged if it is ticked; unticked sets are dropped on finish (like Hevy). */
 export async function finishWorkout(a: ActiveWorkout): Promise<Workout | null> {
   const exercises = a.exercises
-    .map(e => ({ ...e, sets: e.sets.filter(s => s.done).map(({ done: _d, ...s }) => s) }))
+    .map(({ auto: _auto, ...e }) => ({ ...e, sets: e.sets.filter(s => s.done).map(({ done: _d, ...s }) => s) }))
     .filter(e => e.sets.length);
   if (!exercises.length) return null;
   const w: Workout = {
@@ -95,7 +117,12 @@ export async function importFile(text: string) {
       await db.kv.put({ key: 'prefs', value: { ...p, ...Object.fromEntries(Object.entries(f.prefs).filter(([, v]) => v != null)) } });
     }
   });
-  return { workouts: workouts.length, routines: routines.length, exercises: exercises.filter(e => e.custom).length };
+  // Match the settings to how you actually train (weekly target, volume band, rest), straight after importing.
+  const all = await db.workouts.orderBy('start').reverse().toArray();
+  const exMap = new Map((await db.exercises.toArray()).map(e => [e.id, e]));
+  const tuned = autoTune(all, exMap, all.length ? all[0].start + 86400 : nowSec());
+  await setPrefs({ weeklyTarget: tuned.weeklyTarget, volumeBand: tuned.volumeBand, ...(tuned.defaultRest ? { defaultRest: tuned.defaultRest } : {}) });
+  return { workouts: workouts.length, routines: routines.length, exercises: exercises.filter(e => e.custom).length, tuned };
 }
 
 export async function exportBackup() {

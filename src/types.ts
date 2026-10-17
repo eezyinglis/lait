@@ -49,6 +49,8 @@ export interface WExercise {
   rest: number | null;
   /** Unilateral: every set is logged as a left + right pair and the rest timer is halved. */
   uni?: boolean;
+  /** Logger only: targets were auto-filled for this exercise. */
+  auto?: boolean;
   sets: WSet[];
 }
 
@@ -70,7 +72,8 @@ export interface Workout {
 
 export interface Readiness { sleep: number; energy: number; soreness: number }
 
-export interface Gym { id: string; name: string; order: number }
+/** A gym; with a location, workouts started nearby pick it automatically. */
+export interface Gym { id: string; name: string; order: number; lat?: number | null; lon?: number | null }
 
 /** Per gym + exercise: machine settings and the weights the machine actually has. Id is `${gymId}|${exId}`. */
 export interface Machine {
@@ -128,7 +131,10 @@ export interface Routine {
 }
 
 /** An in-progress workout, persisted so closing the app never loses it. */
-export type ActiveWorkout = Omit<Workout, 'end' | 'source'>;
+export type ActiveWorkout = Omit<Workout, 'end' | 'source'> & {
+  /** Set once the next-session targets have been filled in automatically. */
+  autofilled?: boolean;
+};
 
 /** Running rest timer, stored separately from the workout so the two never overwrite each other. */
 export interface RestState {
@@ -150,6 +156,10 @@ export interface Prefs {
   readinessCheck: boolean;
   /** Days between backup reminders (0 = off). */
   backupEveryDays: number;
+  /** Fill each workout with the overload targets automatically. */
+  autoFill: boolean;
+  /** Pick the nearest saved gym from your location when starting a workout. */
+  autoGym: boolean;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -161,6 +171,8 @@ export const DEFAULT_PREFS: Prefs = {
   volumeBand: [10, 20],
   readinessCheck: true,
   backupEveryDays: 7,
+  autoFill: true,
+  autoGym: true,
 };
 
 export type PRType = 'best_weight' | 'best_1rm' | 'best_volume' | 'best_reps' | 'best_duration' | 'best_distance';

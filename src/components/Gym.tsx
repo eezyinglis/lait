@@ -1,21 +1,16 @@
 // Gyms and per-gym machine profiles (settings + the weights a machine actually has).
 import { useEffect, useState } from 'react';
 import { useData } from '../store';
-import { db, machineId, setCurrentGym, uid } from '../db';
+import { db, machineId, setCurrentGym } from '../db';
 import { formatStack, learnStack, parseStack } from '../lib/training';
 import { num, toW, fromW, wUnit } from '../lib/format';
 import type { Machine } from '../types';
 import { Icon, Sheet } from './ui';
-
-export async function addGym(name: string) {
-  const id = uid();
-  await db.gyms.put({ id, name: name.trim() || 'Gym', order: await db.gyms.count() });
-  return id;
-}
+import { addGymHere } from './Setup';
 
 /** Choose the gym for a workout (or for new workouts), or add one. */
 export function GymPicker({ open, onClose, value, onPick }: { open: boolean; onClose: () => void; value: string | null; onPick: (id: string | null) => void }) {
-  const { gyms } = useData();
+  const { gyms, prefs } = useData();
   const [name, setName] = useState('');
   const pick = async (id: string | null) => { onPick(id); await setCurrentGym(id); onClose(); };
   return (
@@ -30,7 +25,7 @@ export function GymPicker({ open, onClose, value, onPick }: { open: boolean; onC
         <button className={'menu-i' + (value == null ? ' on' : '')} onClick={() => pick(null)}>No specific gym</button>
         <div className="row gap add-row">
           <input className="text-in" placeholder="New gym name" value={name} onChange={e => setName(e.target.value)} />
-          <button className="btn primary sm" disabled={!name.trim()} onClick={async () => { const id = await addGym(name); setName(''); await pick(id); }}>Add</button>
+          <button className="btn primary sm" disabled={!name.trim()} onClick={async () => { const { id } = await addGymHere(name, prefs.autoGym); setName(''); await pick(id); }}>Add</button>
         </div>
       </div>
     </Sheet>

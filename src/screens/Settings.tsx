@@ -4,8 +4,10 @@ import { db, setCurrentGym, setPrefs } from '../db';
 import { importFile, wipeAll } from '../lib/actions';
 import { clock } from '../lib/format';
 import { Header, Icon, Segmented, Sheet } from '../components/ui';
-import { addGym } from '../components/Gym';
 import { runBackup } from '../components/Banners';
+import { addGymHere, QR } from '../components/Setup';
+import { appUrl, getPosition, isPhone } from '../lib/device';
+import { go } from '../router';
 
 export function Settings() {
   const { prefs, workouts, gyms, currentGym, lastBackup } = useData();
@@ -51,6 +53,12 @@ export function Settings() {
         <label className="inline">Readiness check-in before workouts
           <input type="checkbox" checked={prefs.readinessCheck} onChange={e => setPrefs({ readinessCheck: e.target.checked })} />
         </label>
+        <label className="inline">Fill in next-session targets automatically
+          <input type="checkbox" checked={prefs.autoFill} onChange={e => setPrefs({ autoFill: e.target.checked })} />
+        </label>
+        <label className="inline">Pick the gym from my location
+          <input type="checkbox" checked={prefs.autoGym} onChange={e => setPrefs({ autoGym: e.target.checked })} />
+        </label>
         <h3>Goals</h3>
         <label className="inline">Workouts per week
           <select value={prefs.weeklyTarget} onChange={e => setPrefs({ weeklyTarget: Number(e.target.value) })}>
@@ -71,6 +79,13 @@ export function Settings() {
           <div key={g.id} className="gym-row">
             <button className={'radio' + (g.id === currentGym ? ' on' : '')} aria-label={`Use ${g.name}`} onClick={() => setCurrentGym(g.id)} />
             <input className="text-in grow" value={g.name} onChange={e => db.gyms.update(g.id, { name: e.target.value })} aria-label="Gym name" />
+            <button className={'icon-btn sm' + (g.lat != null ? ' located' : '')} title={g.lat != null ? 'Location saved: tap to update' : 'Save this gym’s location (stand in the gym)'}
+              aria-label={`Set location of ${g.name} to here`}
+              onClick={async () => {
+                const p = await getPosition(8000);
+                if (p) await db.gyms.update(g.id, { lat: p.lat, lon: p.lon });
+                setMsg(p ? `${g.name}: location saved. Workouts started there pick it automatically.` : 'Location unavailable. Allow location access for LAIT and try again.');
+              }}>📍</button>
             <button className="icon-btn sm" aria-label={`Delete ${g.name}`} onClick={async () => {
               await db.transaction('rw', db.gyms, db.machines, db.kv, async () => {
                 await db.gyms.delete(g.id);
@@ -82,7 +97,11 @@ export function Settings() {
         ))}
         <div className="row gap">
           <input className="text-in grow" placeholder="Add a gym" value={gymName} onChange={e => setGymName(e.target.value)} />
-          <button className="btn primary sm" disabled={!gymName.trim()} onClick={async () => { const id = await addGym(gymName); setGymName(''); if (!currentGym) await setCurrentGym(id); }}>Add</button>
+          <button className="btn primary sm" disabled={!gymName.trim()} onClick={async () => {
+            const r = await addGymHere(gymName, prefs.autoGym);
+            setGymName('');
+            setMsg(r.located ? `${gymName.trim()} added with its location.` : `${gymName.trim()} added. Use 📍 inside the gym to save its location.`);
+          }}>Add</button>
         </div>
       </section>
 
@@ -107,6 +126,15 @@ export function Settings() {
         </p>
         <button className="btn danger-ghost full" onClick={() => setWipe(true)}>Delete all data</button>
       </section>
+
+      {!isPhone() && (
+        <section className="card form">
+          <h3>Open on your iPhone</h3>
+          <p className="muted small">Scan with the iPhone camera, open in Safari, then Share → Add to Home Screen.</p>
+          <div className="qr-wrap"><QR text={appUrl()} /></div>
+        </section>
+      )}
+      <button className="btn ghost full setup-again" onClick={() => db.kv.delete('setupDone').then(() => go('/'))}>Run setup again</button>
 
       <p className="muted small center-t">LAIT · your own training log</p>
 

@@ -30,6 +30,8 @@ interface Data {
   experiments: Experiment[]; // newest first
   /** Unix ms of the last backup, if any. */
   lastBackup: number | null;
+  /** First-launch setup finished or dismissed. */
+  setupDone: boolean;
 }
 
 const Ctx = createContext<Data | null>(null);
@@ -38,7 +40,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const workouts = useLiveQuery(() => db.workouts.orderBy('start').reverse().toArray(), []);
   const routines = useLiveQuery(() => db.routines.orderBy('order').toArray(), []);
   const exList = useLiveQuery(() => db.exercises.toArray(), []);
-  const kv = useLiveQuery(() => db.kv.bulkGet(['prefs', 'active', 'rest', 'currentGym', 'lastBackup']), []);
+  const kv = useLiveQuery(() => db.kv.bulkGet(['prefs', 'active', 'rest', 'currentGym', 'lastBackup', 'setupDone']), []);
   const gyms = useLiveQuery(() => db.gyms.orderBy('order').toArray(), []);
   const machineList = useLiveQuery(() => db.machines.toArray(), []);
   const body = useLiveQuery(() => db.body.orderBy('date').reverse().toArray(), []);
@@ -60,7 +62,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [experiments, history]);
 
-  const [prefsRow, activeRow, restRow, gymRow, backupRow] = kv ?? [];
+  const [prefsRow, activeRow, restRow, gymRow, backupRow, setupRow] = kv ?? [];
   const value: Data = {
     ready: !!workouts && !!routines && !!exList,
     workouts: workouts ?? [],
@@ -78,6 +80,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     body: body ?? [],
     experiments: experiments ?? [],
     lastBackup: (backupRow?.value as number) ?? null,
+    // Unknown until the first query resolves; treat as done meanwhile so the wizard doesn't flash.
+    setupDone: kv ? !!setupRow?.value : true,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

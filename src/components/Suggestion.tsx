@@ -13,21 +13,28 @@ import { Icon } from './ui';
  * from that gym (when there are at least 2) and jumps along that machine's real weight stack.
  */
 export function useSuggestion(exId: string, ctx: { gymId?: string | null; readiness?: number | null } = {}): Suggestion | null {
-  const { history, exercises, prefs, overloadPrior, machines, currentGym } = useData();
-  const ex = exercises.get(exId);
-  const gymId = ctx.gymId === undefined ? currentGym : ctx.gymId;
-  const machine = gymId ? machines.get(machineId(gymId, exId)) : undefined;
-  return useMemo(() => {
-    const all = history.byExercise.get(exId);
-    if (!ex || !all?.length) return null;
-    const atGym = gymId ? all.filter(s => s.gymId === gymId) : [];
-    const sessions = atGym.length >= 2 ? atGym : all;
-    const stack = effectiveStack(machine?.weights, gymId ? learnStack(all, gymId) : []);
-    return suggest(sessions, ex.type, ex.equip, Date.now() / 1000, {
-      prior: overloadPrior, stack, readiness: ctx.readiness ?? null,
-      fw: kg => `${num(toW(kg, prefs), 2)} ${wUnit(prefs)}`,
-    });
-  }, [history, ex, exId, prefs, overloadPrior, gymId, machine, ctx.readiness]);
+  const data = useData();
+  const gymId = ctx.gymId === undefined ? data.currentGym : ctx.gymId;
+  const machine = gymId ? data.machines.get(machineId(gymId, exId)) : undefined;
+  return useMemo(() => suggestionFor(data, exId, gymId, ctx.readiness ?? null),
+    [data.history, data.exercises, exId, data.prefs, data.overloadPrior, gymId, machine, ctx.readiness]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+type SuggestData = Pick<ReturnType<typeof useData>, 'history' | 'exercises' | 'prefs' | 'overloadPrior' | 'machines'>;
+
+/** Same as useSuggestion, callable outside render (e.g. to fill a whole workout at once). */
+export function suggestionFor(d: SuggestData, exId: string, gymId: string | null, readiness: number | null): Suggestion | null {
+  const ex = d.exercises.get(exId);
+  const all = d.history.byExercise.get(exId);
+  if (!ex || !all?.length) return null;
+  const machine = gymId ? d.machines.get(machineId(gymId, exId)) : undefined;
+  const atGym = gymId ? all.filter(s => s.gymId === gymId) : [];
+  const sessions = atGym.length >= 2 ? atGym : all;
+  const stack = effectiveStack(machine?.weights, gymId ? learnStack(all, gymId) : []);
+  return suggest(sessions, ex.type, ex.equip, Date.now() / 1000, {
+    prior: d.overloadPrior, stack, readiness,
+    fw: kg => `${num(toW(kg, d.prefs), 2)} ${wUnit(d.prefs)}`,
+  });
 }
 
 export const ADVICE: Record<Advice, { label: string; cls: string; icon: string }> = {

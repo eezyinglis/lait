@@ -7,14 +7,17 @@ import { clock, fmtDuration, fmtVolume, PR_LABEL } from '../lib/format';
 import type { ActiveWorkout, Readiness, Workout } from '../types';
 import { readinessScore } from '../lib/training';
 import { GymPicker } from '../components/Gym';
+import { runBackup } from '../components/Banners';
 import { ExerciseCard, listOps, supersetLabels } from '../components/ExerciseCard';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { Icon, Sheet } from '../components/ui';
 import { go } from '../router';
 import { cancelBeep, startRest } from '../components/RestTimer';
+import { applyTargets, suggestionFor } from '../components/Suggestion';
 
 export function Logger() {
-  const { active, exercises, history, prefs, types, gyms } = useData();
+  const data = useData();
+  const { active, exercises, history, prefs, types, gyms } = data;
   const [w, setW] = useState<ActiveWorkout | null>(active);
   const [picker, setPicker] = useState(false);
   const [gymOpen, setGymOpen] = useState(false);
@@ -23,8 +26,13 @@ export function Logger() {
   const [now, setNow] = useState(Date.now());
   const saveT = useRef<number | undefined>(undefined);
 
-  // Adopt the stored workout when it first loads (the live query resolves after the first render).
-  useEffect(() => { if (active && (!w || active.id !== w.id)) setW(active); }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Adopt the stored workout when it first loads (the live query resolves after the first render), and a gym
+  // picked automatically from your location while nothing has been logged yet.
+  useEffect(() => {
+    if (!active) return;
+    if (!w || active.id !== w.id) { setW(active); return; }
+    if (active.gymId !== w.gymId && !w.exercises.some(e => e.sets.some(s => s.done))) setW({ ...w, gymId: active.gymId });
+  }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
   const update = (next: ActiveWorkout) => {
@@ -51,6 +59,25 @@ export function Logger() {
   }, []);
 
   const labels = useMemo(() => supersetLabels(w?.exercises ?? []), [w?.exercises]);
+
+  // Auto-fill: every exercise that hasn't been started gets its next-session targets, once the readiness
+  // check-in is answered or skipped (so a rough day is already taken into account). Exercises added later
+  // are filled the same way. Each exercise is filled once, so your own edits are never overwritten.
+  useEffect(() => {
+    if (!w || !prefs.autoFill || ended.current) return;
+    if (prefs.readinessCheck && w.readiness === undefined) return;
+    if (!w.exercises.some(e => !e.auto && !e.sets.some(s => s.done))) return;
+    const r = readinessScore(w.readiness);
+    update({
+      ...w,
+      autofilled: true,
+      exercises: w.exercises.map(e => {
+        if (e.auto || e.sets.some(s => s.done)) return e;
+        const s = suggestionFor(data, e.exId, w.gymId ?? null, r);
+        return { ...(s ? applyTargets(e, s.sets) : e), auto: true };
+      }),
+    });
+  }, [w, prefs.autoFill, prefs.readinessCheck, data.history]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (done) return <Summary w={done} />;
   if (!w) {
@@ -159,7 +186,7 @@ export function Logger() {
 }
 
 function Summary({ w }: { w: Workout }) {
-  const { exercises, prefs, types, workouts, routines } = useData();
+  const { exercises, prefs, types, workouts, routines, lastBackup } = useData();
   // PRs for this workout, computed with the saved workout included even before the live query catches up.
   const all = workouts.some(x => x.id === w.id) ? workouts : [w, ...workouts];
   const h = useMemo(() => buildHistory(all, types), [all.length, types]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -167,6 +194,8 @@ function Summary({ w }: { w: Workout }) {
   const nth = all.filter(x => x.start <= w.start).length;
   const routine = w.routineId ? routines.find(r => r.id === w.routineId) : undefined;
   const [updated, setUpdated] = useState(false);
+  const [backedUp, setBackedUp] = useState(false);
+  const backupDue = prefs.backupEveryDays > 0 && (!lastBackup || Date.now() - lastBackup > prefs.backupEveryDays * 86400000);
   return (
       <div className="screen summary">
         <div className="trophy-big"><Icon name="trophy" size={44} /></div>
@@ -190,6 +219,11 @@ function Summary({ w }: { w: Workout }) {
         {routine && (
           <button className="btn ghost full" disabled={updated} onClick={async () => { await updateRoutineFromWorkout(routine.id, w); setUpdated(true); }}>
             {updated ? 'Routine updated ✓' : `Update “${routine.title}” with these values`}
+          </button>
+        )}
+        {backupDue && !backedUp && (
+          <button className="btn ghost full backup-now" onClick={async () => { await runBackup(); setBackedUp(true); }}>
+            <Icon name="list" size={16} /> Back up now (your data lives only on this phone)
           </button>
         )}
         <button className="btn primary full" onClick={() => go(`/workout/${w.id}`)}>View workout</button>

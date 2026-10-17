@@ -370,3 +370,19 @@ select { background: var(--card2); border: 0; border-radius: 10px; padding: 9px 
 .unit-in { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .unit-in input { width: 90px; text-align: right; background: var(--card2); border: 0; border-radius: 8px; padding: 8px; outline: none; }
 .form input[type='date'] { background: var(--card2); border: 0; border-radius: 8px; padding: 8px; color: var(--text); }
+
+/* ---- Setup wizard ---- */
+.setup { border: 1px solid #263a5c; }
+.setup h3 { margin: 0; }
+.step { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #222228; }
+.step:last-of-type { border-bottom: 0; }
+.step-n { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--card2); font-weight: 800; }
+.step.done .step-n { background: #30d158; color: #000; }
+.step.done b { color: var(--muted); text-decoration: line-through; }
+.step p { margin: 4px 0 8px; }
+.qr-wrap { display: flex; justify-content: center; padding: 10px 0; }
+.qr { border-radius: 10px; background: #fff; }
+.share-ic { display: inline-block; padding: 0 4px; border-radius: 4px; background: var(--card2); }
+.icon-btn.located { color: #30d158; }
+.backup-now { color: #ffd28a; }
+.setup-again { margin: 10px 10px 0; width: calc(100% - 20px); }

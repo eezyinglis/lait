@@ -5,4 +5,6 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: './',
   plugins: [react()],
+  // One ~500 kB bundle (≈150 kB gzipped) is fine for an installed, offline-cached app.
+  build: { chunkSizeWarningLimit: 700 },
 });

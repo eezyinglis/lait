@@ -6,6 +6,7 @@ import type { Workout } from '../types';
 import { go } from '../router';
 import { Header, Icon } from '../components/ui';
 import { BackupBanner, DeloadBanner } from '../components/Banners';
+import { SetupWizard } from '../components/Setup';
 
 export function WorkoutCard({ w }: { w: Workout }) {
   const { exercises, types, prefs, history } = useData();
@@ -38,7 +39,7 @@ export function WorkoutCard({ w }: { w: Workout }) {
 const PAGE = 20;
 
 export function Home() {
-  const { workouts, ready } = useData();
+  const { workouts, ready, setupDone } = useData();
   const [n, setN] = useState(PAGE);
   const sentinel = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -54,7 +55,8 @@ export function Home() {
   return (
     <div className="screen">
       <Header title={<span className="brand">LAIT</span>} right={<button className="icon-btn" aria-label="Settings" onClick={() => go('/settings')}><Icon name="gear" /></button>} />
-      {ready && workouts.length === 0 && (
+      <SetupWizard />
+      {ready && setupDone && workouts.length === 0 && (
         <div className="empty big">
           <Icon name="dumbbell" size={40} />
           <p>No workouts yet</p>

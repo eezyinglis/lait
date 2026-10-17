@@ -364,3 +364,66 @@ export function copyLast(ex: WExercise, last: WSet[]): WExercise {
   return { ...ex, uni: last.some(s => s.side) || undefined, sets: [...done, ...fresh] };
 }
 
+
+// ---- Auto-tune settings from history ----------------------------------------------------------------
+
+const BANDS: [number, number][] = [[6, 10], [8, 14], [10, 20], [12, 22], [15, 25]];
+
+export interface Tuned {
+  weeklyTarget: number;
+  volumeBand: [number, number];
+  /** Seconds; null if the history has no set timestamps. */
+  defaultRest: number | null;
+}
+
+/**
+ * Settings that match how you actually train, learned from history:
+ * - weekly target: median workouts per active week over the last 12 weeks,
+ * - volume band: the preset closest to your typical weekly sets per muscle,
+ * - default rest: median time between completed sets (minus ~35 s for the set itself), to the nearest 15 s.
+ */
+export function autoTune(workouts: Workout[], exercises: Map<string, Exercise>, nowSec: number): Tuned {
+  const recent = workouts.filter(w => w.start >= nowSec - 12 * WEEK);
+  const perWeek = new Map<number, number>();
+  for (const w of recent) perWeek.set(weekStart(w.start), (perWeek.get(weekStart(w.start)) ?? 0) + 1);
+  // Your normal rhythm, not the light weeks: the 75th percentile of weeks you trained at all.
+  const counts = [...perWeek.values()].sort((a, b) => a - b);
+  const p75 = counts.length ? counts[Math.min(counts.length - 1, Math.floor(counts.length * 0.75))] : 0;
+  const weeklyTarget = Math.min(7, Math.max(1, p75 || 3));
+
+  const vol = muscleVolume(workouts, exercises, nowSec, [10, 20]).filter(v => v.perWeek > 0).slice(0, 8);
+  const typical = median(vol.map(v => v.perWeek));
+  // The preset whose middle is closest to your typical weekly sets (a little above, to leave room to grow).
+  const volumeBand = vol.length
+    ? BANDS.reduce((b, x) => (Math.abs((x[0] + x[1]) / 2 - typical * 1.15) < Math.abs((b[0] + b[1]) / 2 - typical * 1.15) ? x : b))
+    : [10, 20] as [number, number];
+
+  const gaps: number[] = [];
+  for (const w of workouts.slice(0, 60)) for (const e of w.exercises) {
+    const t = e.sets.map(s => s.at ?? 0).filter(Boolean).sort((a, b) => a - b);
+    for (let i = 1; i < t.length; i++) { const g = t[i] - t[i - 1]; if (g >= 30 && g <= 600) gaps.push(g); }
+  }
+  const defaultRest = gaps.length >= 10 ? Math.min(300, Math.max(30, Math.round((median(gaps) - 35) / 15) * 15)) : null;
+  return { weeklyTarget, volumeBand, defaultRest };
+}
+
+// ---- Gym by location ---------------------------------------------------------------------------------
+
+/** Metres between two coordinates (haversine). */
+export function distanceM(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000, rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/** The closest saved gym within `maxM` metres (gyms without a location are ignored). */
+export function nearestGym<G extends { id: string; lat?: number | null; lon?: number | null }>(gyms: G[], lat: number, lon: number, maxM = 400): G | null {
+  let best: G | null = null, bestD = Infinity;
+  for (const g of gyms) {
+    if (g.lat == null || g.lon == null) continue;
+    const d = distanceM(lat, lon, g.lat, g.lon);
+    if (d < bestD && d <= maxM) { best = g; bestD = d; }
+  }
+  return best;
+}
