@@ -61,6 +61,9 @@ function DurInput({ value, onChange, placeholder, plainIsMinutes }: { value: num
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
+/** 'failure', '2 RIR', or 'not set'. */
+export const rirText = (rir: number | null | undefined) => (rir == null ? 'not set' : rir === 0 ? 'failure' : `${Math.min(3, rir)} RIR`);
+
 interface Props {
   ex: WExercise;
   exercise: Exercise | undefined;
@@ -74,6 +77,8 @@ interface Props {
   readiness?: number | null;
   /** Show the next-session suggestion strip (off when editing a past workout). */
   showSuggestion?: boolean;
+  /** Show the RIR (reps in reserve) column. Defaults to on while logging. */
+  rirInput?: boolean;
   onChange: (ex: WExercise) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
@@ -101,7 +106,7 @@ function SetRow({ children, onSwipe, className, style }: { children: React.React
   return <div className={className} style={style} {...swipe}>{children}</div>;
 }
 
-export function ExerciseCard({ ex, exercise, prefs, previous, mode, supersetLabel, gymId = null, readiness = null, showSuggestion = true, onChange, onRemove, onMove, onToggleSuperset, onSetDone }: Props) {
+export function ExerciseCard({ ex, exercise, prefs, previous, mode, supersetLabel, gymId = null, readiness = null, showSuggestion = true, rirInput, onChange, onRemove, onMove, onToggleSuperset, onSetDone }: Props) {
   const { history, machines, exercises } = useData();
   const t = exercise?.type ?? 'weight_reps';
   const [menu, setMenu] = useState(false);
@@ -111,7 +116,9 @@ export function ExerciseCard({ ex, exercise, prefs, previous, mode, supersetLabe
   const [pickAny, setPickAny] = useState(false);
   const cols = { w: usesWeight(t), r: usesReps(t), d: usesDistance(t), s: usesDuration(t) };
   const inputs = Object.values(cols).filter(Boolean).length;
-  const gridStyle = { gridTemplateColumns: `34px ${mode === 'log' ? 'minmax(64px, 1.3fr) ' : ''}${'minmax(0, 1fr) '.repeat(inputs)}${mode === 'log' ? '38px' : ''}` };
+  const rirCol = (rirInput ?? mode === 'log') && cols.r;
+  const [rirOpen, setRirOpen] = useState<number | null>(null);
+  const gridStyle = { gridTemplateColumns: `34px ${mode === 'log' ? 'minmax(56px, 1.2fr) ' : ''}${'minmax(0, 1fr) '.repeat(inputs)}${rirCol ? '40px ' : ''}${mode === 'log' ? '38px' : ''}` };
 
   const sessions = history.byExercise.get(ex.exId) ?? [];
   const machine = gymId ? machines.get(machineId(gymId, ex.exId)) : undefined;
@@ -135,10 +142,13 @@ export function ExerciseCard({ ex, exercise, prefs, previous, mode, supersetLabe
     onSetDone?.(rest);
   };
 
-  // "Reps left?" is asked for the most recently ticked working set until answered (or dismissed with ✕ = skip).
-  const rirIdx = mode === 'log' && weighted
+  // "Reps left?" pops up for the most recently ticked working set until answered (or dismissed with ✕ = skip);
+  // tapping a set's RIR cell opens it for that set instead.
+  const autoRir = mode === 'log' && rirCol
     ? ex.sets.reduce((best, s, i) => (s.done && s.type !== 'warmup' && s.rir === undefined && (best < 0 || (s.at ?? 0) >= (ex.sets[best].at ?? 0)) ? i : best), -1)
     : -1;
+  const rirIdx = rirOpen ?? autoRir;
+  const setRir = (i: number, v: number | null) => { patchSet(i, { rir: v }); setRirOpen(null); };
 
   // Back-off target: once the top set (first working set of a side) is done, the next working set of that side
   // gets a target from what you actually just did, using your usual drop-off.
@@ -216,6 +226,7 @@ export function ExerciseCard({ ex, exercise, prefs, previous, mode, supersetLabe
         {cols.d && <span>{t === 'short_distance_weight' ? 'M' : dUnit(prefs).toUpperCase()}</span>}
         {cols.r && <span>{t === 'floors_duration' ? 'FLOORS' : t === 'steps_duration' ? 'STEPS' : 'REPS'}</span>}
         {cols.s && <span>TIME</span>}
+        {rirCol && <span>RIR</span>}
         {mode === 'log' && <span className="tick-h"><Icon name="check" size={16} /></span>}
       </div>
 
@@ -248,18 +259,25 @@ export function ExerciseCard({ ex, exercise, prefs, previous, mode, supersetLabe
               {cols.r && <NumInput ariaLabel="Reps" decimals={false} value={s.reps} placeholder={ph('reps')} onChange={v => patchSet(i, { reps: v })} />}
               {cols.s && <DurInput value={s.sec} placeholder={prev?.sec != null ? clock(prev.sec) : ''} plainIsMinutes={t !== 'duration' && t !== 'weight_duration'}
                 onChange={v => patchSet(i, { sec: v })} />}
+              {rirCol && (s.type === 'warmup' ? <span /> : (
+                <button className={'rir-btn' + (s.rir != null ? ' set' : '') + (s.rir === 0 ? ' fail' : '')}
+                  aria-label={`Reps in reserve: ${rirText(s.rir)}`} onClick={() => setRirOpen(rirOpen === i ? null : i)}>
+                  {s.rir == null ? '–' : s.rir === 0 ? 'F' : Math.min(3, s.rir)}
+                </button>
+              ))}
               {mode === 'log' && (
                 <button className={'tick' + (s.done ? ' on' : '')} onClick={() => tick(i)} aria-label={s.done ? 'Undo set' : 'Complete set'}>
                   <Icon name="check" size={18} stroke={3} />
-                  {s.done && s.rir != null && <span className="rir-tag">{s.rir >= 3 ? '3+' : s.rir}</span>}
                 </button>
               )}
             </SetRow>
             {i === rirIdx && (
               <div className="rir-row">
                 <span>Reps left?</span>
-                {[0, 1, 2, 3].map(v => <button key={v} className="chip" onClick={() => patchSet(i, { rir: v })}>{v === 3 ? '3+' : v}</button>)}
-                <button className="chip ghost" aria-label="Skip" onClick={() => patchSet(i, { rir: null })}>✕</button>
+                {[0, 1, 2, 3].map(v => (
+                  <button key={v} className={'chip' + (s.rir === v ? ' on' : '')} onClick={() => setRir(i, v)}>{v === 0 ? 'Failure' : v}</button>
+                ))}
+                <button className="chip ghost" aria-label={s.rir != null ? 'Clear' : 'Skip'} onClick={() => setRir(i, null)}>✕</button>
               </div>
             )}
             {bo && i !== rirIdx && (

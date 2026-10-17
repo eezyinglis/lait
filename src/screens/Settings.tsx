@@ -56,6 +56,12 @@ export function Settings() {
         <label className="inline">Fill in next-session targets automatically
           <input type="checkbox" checked={prefs.autoFill} onChange={e => setPrefs({ autoFill: e.target.checked })} />
         </label>
+        <label className="inline">Keep the screen on during workouts
+          <input type="checkbox" checked={prefs.keepAwake} onChange={e => setPrefs({ keepAwake: e.target.checked })} />
+        </label>
+        <label className="inline">Show muscle recovery
+          <input type="checkbox" checked={prefs.showRecovery} onChange={e => setPrefs({ showRecovery: e.target.checked })} />
+        </label>
         <label className="inline">Pick the gym from my location
           <input type="checkbox" checked={prefs.autoGym} onChange={e => setPrefs({ autoGym: e.target.checked })} />
         </label>

@@ -14,6 +14,7 @@ import { Icon, Sheet } from '../components/ui';
 import { go } from '../router';
 import { cancelBeep, startRest } from '../components/RestTimer';
 import { applyTargets, suggestionFor } from '../components/Suggestion';
+import { keepScreenOn } from '../lib/device';
 
 export function Logger() {
   const data = useData();
@@ -34,6 +35,9 @@ export function Logger() {
     if (active.gymId !== w.gymId && !w.exercises.some(e => e.sets.some(s => s.done))) setW({ ...w, gymId: active.gymId });
   }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  // Keep the screen on while the logger is open, so the rest timer and its beep keep running.
+  const workoutOpen = !!w && !done;
+  useEffect(() => keepScreenOn(prefs.keepAwake && workoutOpen), [prefs.keepAwake, workoutOpen]);
 
   const update = (next: ActiveWorkout) => {
     setW(next);

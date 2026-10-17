@@ -82,7 +82,7 @@ export function EditWorkout({ id }: { id: string }) {
 
       {w.exercises.map((ex, i) => (
         <ExerciseCard key={i + ex.exId} ex={ex} exercise={exercises.get(ex.exId)} prefs={prefs} mode="routine" previous={[]}
-          showSuggestion={false} gymId={w.gymId ?? null} supersetLabel={labels[i]}
+          showSuggestion={false} rirInput gymId={w.gymId ?? null} supersetLabel={labels[i]}
           onChange={e => ops.change(i, e)} onRemove={() => ops.remove(i)} onMove={d => ops.move(i, d)} onToggleSuperset={() => ops.toggleSuperset(i)} />
       ))}
       <div className="log-actions">

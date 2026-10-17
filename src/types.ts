@@ -160,6 +160,10 @@ export interface Prefs {
   autoFill: boolean;
   /** Pick the nearest saved gym from your location when starting a workout. */
   autoGym: boolean;
+  /** Show muscle recovery on the Workout tab and routines. */
+  showRecovery: boolean;
+  /** Keep the screen on while a workout is open. */
+  keepAwake: boolean;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -173,6 +177,8 @@ export const DEFAULT_PREFS: Prefs = {
   backupEveryDays: 7,
   autoFill: true,
   autoGym: true,
+  showRecovery: true,
+  keepAwake: true,
 };
 
 export type PRType = 'best_weight' | 'best_1rm' | 'best_volume' | 'best_reps' | 'best_duration' | 'best_distance';

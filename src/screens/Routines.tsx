@@ -8,6 +8,7 @@ import { ExerciseCard, listOps, supersetLabels } from '../components/ExerciseCar
 import { ExercisePicker } from '../components/ExercisePicker';
 import { Empty, Header, Icon, Sheet } from '../components/ui';
 import { estimateMinutes, timeBox } from '../lib/training';
+import { RecoveryCard, RoutineReadiness } from '../components/Recovery';
 
 /** Starts a workout, or simply opens the one already running. */
 async function start(r?: Routine) {
@@ -58,6 +59,9 @@ export function Routines() {
         <button className="btn ghost full big-start" onClick={() => start()}>
           <Icon name="plus" size={20} /> {active ? 'Resume workout in progress' : 'Start empty workout'}
         </button>
+      </div>
+      <RecoveryCard />
+      <div className="pad-x">
         <div className="row between">
           <h2 className="sec">Routines</h2>
           <button className="btn ghost sm" onClick={async () => go(`/routine/${await newRoutine()}`)}><Icon name="plus" size={16} /> New</button>
@@ -70,6 +74,7 @@ export function Routines() {
             <div className="rcard-title">{r.title}</div>
             <div className="muted small clamp2">{r.exercises.map(e => exercises.get(e.exId)?.title ?? '?').join(', ') || 'No exercises'}</div>
           </button>
+          {r.exercises.length > 0 && <RoutineReadiness exercises={r.exercises} />}
           <div className="row gap rcard-actions">
             <button className="btn ghost" onClick={() => go(`/routine/${r.id}`)}><Icon name="edit" size={16} /> Edit</button>
             <button className="btn primary grow" disabled={!!active || r.exercises.length === 0} onClick={() => setStarting(r)}>Start routine</button>

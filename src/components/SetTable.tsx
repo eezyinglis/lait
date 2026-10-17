@@ -28,7 +28,10 @@ export function SetTable({ sets, type, prefs, prs }: { sets: WSet[]; type: Exerc
         return (
           <div className="set-line" key={i}>
             <span className={'set-badge ' + s.type + (s.side ? ' sided' : '')}>{labels[i]}</span>
-            <span className="set-txt">{setText(s, type, prefs)}</span>
+            <span className="set-txt">
+              {setText(s, type, prefs)}
+              {s.type !== 'warmup' && s.rir != null && <span className={'rir-inline' + (s.rir === 0 ? ' fail' : '')}>{s.rir === 0 ? 'failure' : `${Math.min(3, s.rir)} RIR`}</span>}
+            </span>
             {p && <span className="pr-chip" title={p.map(x => PR_LABEL[x.type]).join(', ')}><Icon name="trophy" size={13} /> {p.length > 1 ? p.length : 'PR'}</span>}
           </div>
         );

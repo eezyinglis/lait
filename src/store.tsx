@@ -6,6 +6,7 @@ import { db } from './db';
 import { buildHistory, type HistoryIndex } from './lib/stats';
 import { personalRate } from './lib/overload';
 import { evaluateExperiment } from './lib/training';
+import { calibrate, type Calibration } from './lib/recovery';
 import type { ActiveWorkout, BodyEntry, Exercise, ExerciseType, Experiment, Gym, Machine, Prefs, RestState, Routine, Workout } from './types';
 import { DEFAULT_PREFS } from './types';
 
@@ -32,6 +33,8 @@ interface Data {
   lastBackup: number | null;
   /** First-launch setup finished or dismissed. */
   setupDone: boolean;
+  /** Personal recovery calibration from your history (performance vs time since a muscle was trained). */
+  recoveryCal: Calibration;
 }
 
 const Ctx = createContext<Data | null>(null);
@@ -51,6 +54,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const history = useMemo(() => buildHistory(workouts ?? [], types), [workouts, types]);
   const overloadPrior = useMemo(() => personalRate(history.byExercise.values()), [history]);
   const machines = useMemo(() => new Map((machineList ?? []).map(m => [m.id, m])), [machineList]);
+  const recoveryCal = useMemo(() => calibrate(workouts ?? [], exercises), [workouts, exercises]);
 
   // Plateau experiments are scored automatically once 3 weeks have passed and the lift was done again.
   useEffect(() => {
@@ -82,6 +86,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     lastBackup: (backupRow?.value as number) ?? null,
     // Unknown until the first query resolves; treat as done meanwhile so the wizard doesn't flash.
     setupDone: kv ? !!setupRow?.value : true,
+    recoveryCal,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

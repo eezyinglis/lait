@@ -311,7 +311,6 @@ select { background: var(--card2); border: 0; border-radius: 10px; padding: 9px 
 .rir-row .chip { padding: 4px 11px; }
 .chip.ghost { background: transparent; color: var(--muted); }
 .tick { position: relative; }
-.rir-tag { position: absolute; right: -4px; top: -6px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; background: #8e5cf0; color: #fff; font-size: 10px; font-weight: 800; display: grid; place-items: center; }
 .backoff-row { display: block; width: 100%; text-align: left; padding: 4px 6px 6px 46px; font-size: 13px; color: #8fb3ff; }
 .text-in { background: var(--card2); border: 0; border-radius: 10px; padding: 10px; outline: none; width: 100%; resize: vertical; }
 .add-row { margin-top: 8px; }
@@ -393,3 +392,34 @@ select { background: var(--card2); border: 0; border-radius: 10px; padding: 9px 
 .edit-meta { gap: 10px; padding-top: 8px; padding-bottom: 4px; }
 .edit-meta input[type='datetime-local'] { background: var(--card2); border: 0; border-radius: 8px; padding: 8px; color: var(--text); }
 .num.short { width: 80px; }
+
+/* ---- RIR ---- */
+.rir-btn { height: 32px; border-radius: 8px; background: var(--card2); color: var(--muted); font-weight: 700; font-size: 14px; text-align: center; }
+.rir-btn.set { color: #c9a7ff; background: #2b1f4a; }
+.rir-btn.fail { color: #fff; background: #8e2c27; }
+.rir-row .chip.on { background: #8e5cf0; color: #fff; }
+.rir-inline { margin-left: 8px; font-size: 12px; color: #c9a7ff; }
+.rir-inline.fail { color: #ff8a80; }
+
+/* ---- Next up & recovery ---- */
+.next-up { border: 1px solid #263a5c; }
+.next-h { display: flex; justify-content: space-between; gap: 8px; }
+.next-title { font-size: 20px; font-weight: 750; margin: 2px 0; }
+.ready-tag { display: inline-block; margin-top: 6px; padding: 4px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.ready-tag.ready { background: #12301c; color: #30d158; }
+.ready-tag.mid { background: #3a2a0a; color: #ffd28a; }
+.ready-tag.low { background: #3a1412; color: #ff8a80; }
+.recovery h3 { margin: 0; }
+.rec-row-m { display: grid; grid-template-columns: 92px 1fr 40px 52px; gap: 8px; align-items: center; padding: 5px 0; font-size: 14px; }
+.rec-row-m b { text-align: right; }
+.rec-row-m .small { text-align: right; }
+.rec-bar { height: 8px; border-radius: 4px; background: var(--card2); overflow: hidden; }
+.rec-bar div { height: 100%; border-radius: 4px; }
+.rec-bar .ready { background: #30d158; }
+.rec-bar .mid { background: var(--warm); }
+.rec-bar .low { background: var(--red); }
+.recovery .btn.sm { margin-top: 6px; }
+.info p { margin: 0 0 10px; font-size: 14px; line-height: 1.5; }
+.cal-table { margin: 0 0 10px; }
+.cal-table .kv { display: grid; grid-template-columns: 1fr auto 70px; gap: 8px; }
+.cal-table .kv b { text-align: right; }

@@ -7,6 +7,7 @@ import { go } from '../router';
 import { Header, Icon } from '../components/ui';
 import { BackupBanner, DeloadBanner } from '../components/Banners';
 import { SetupWizard } from '../components/Setup';
+import { NextUpCard } from '../components/NextUp';
 
 export function WorkoutCard({ w }: { w: Workout }) {
   const { exercises, types, prefs, history } = useData();
@@ -66,6 +67,7 @@ export function Home() {
       )}
       <BackupBanner />
       <DeloadBanner />
+      <NextUpCard />
       {workouts.length > 0 && (
         <div className="week-strip">
           <b>{thisWeek}</b> workout{thisWeek !== 1 ? 's' : ''} this week · <b>{workouts.length}</b> total
