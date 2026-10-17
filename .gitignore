@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.log
+
+# Personal data and Hevy research never go in the repo (it is public for GitHub Pages).
+/data/
+/research/
+/HEVY_BREAKDOWN.md
+tests/private/
+.claude/
