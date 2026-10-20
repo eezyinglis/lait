@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useData } from '../store';
 import { db } from '../db';
 import { back } from '../router';
-import type { Workout } from '../types';
+import type { Illness, Workout } from '../types';
+import { ILLNESS } from '../lib/overload';
 import { ExerciseCard, listOps, supersetLabels } from '../components/ExerciseCard';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { Empty, Header, Icon, Sheet } from '../components/ui';
@@ -77,6 +78,12 @@ export function EditWorkout({ id }: { id: string }) {
             </select>
           </label>
         )}
+        <label className="inline">Illness
+          <select value={w.illness ?? ''} onChange={e => edit({ ...w, illness: (e.target.value || null) as Illness | null })}>
+            <option value="">Healthy</option>
+            {(Object.keys(ILLNESS) as Illness[]).map(k => <option key={k} value={k}>{ILLNESS[k].label}</option>)}
+          </select>
+        </label>
         <textarea className="notes" rows={2} placeholder="Workout notes" value={w.notes} onChange={e => edit({ ...w, notes: e.target.value })} />
       </div>
 

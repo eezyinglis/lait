@@ -216,7 +216,7 @@ export function monthlyReport(workouts: Workout[], history: HistoryIndex, types:
   const gains: { exId: string; pct: number }[] = [], stalled: { exId: string; sessions: number }[] = [];
   for (const [exId, ss] of history.byExercise) {
     if ((types.get(exId) ?? 'weight_reps') !== 'weight_reps') continue;
-    const best = (a: number, b: number) => Math.max(0, ...ss.filter(s => s.start >= a && s.start < b).flatMap(s => working(s.ex.sets).map(setE1rm)));
+    const best = (a: number, b: number) => Math.max(0, ...ss.filter(s => !s.illness && s.start >= a && s.start < b).flatMap(s => working(s.ex.sets).map(setE1rm)));
     const now = best(from, to), before = best(pFrom, from);
     const n = ss.filter(s => s.start >= from && s.start < to).length;
     // A month-over-month change beyond ±25% is a different machine or gym, not strength.

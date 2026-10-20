@@ -68,7 +68,12 @@ export interface Workout {
   gymId?: string | null;
   /** Pre-workout check-in, 1 (bad) to 5 (great). */
   readiness?: Readiness | null;
+  /** Trained while ill or just after: suggestions go easier, and the session doesn't count against progress. */
+  illness?: Illness | null;
 }
+
+/** 'mild' = cold, symptoms above the neck only; 'flu' = back after fever, flu or a chest infection. */
+export type Illness = 'mild' | 'flu';
 
 export interface Readiness { sleep: number; energy: number; soreness: number }
 

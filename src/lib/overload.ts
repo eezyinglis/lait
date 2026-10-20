@@ -16,11 +16,11 @@
 // - Next session: take the next rung only if the projection for that day covers it; otherwise match the
 //   current level and show when the next rung is realistically due.
 // Pure module (only stats.ts at runtime), unit-tested under node.
-import type { ExerciseType, WSet } from '../types';
+import type { ExerciseType, Illness, WSet } from '../types';
 import type { Session } from './stats';
 import { oneRepMax } from './stats.ts';
 
-export type Advice = 'weight' | 'reps' | 'hold' | 'plateau' | 'return';
+export type Advice = 'weight' | 'reps' | 'hold' | 'plateau' | 'return' | 'easy';
 
 export interface SetTarget { kg: number | null; reps: number | null; sec: number | null; side?: 'L' | 'R' | null }
 
@@ -47,6 +47,9 @@ export interface Suggestion {
   theory: { atKg: number; forReps: number; repsAtWeight: number; addReps: number; kgAtReps: number; addKg: number } | null;
   lastDate: number;
   sessions: number;
+  /** Post-illness mode: reps to keep in reserve, and working sets to leave out per exercise. */
+  targetRir?: number;
+  dropSets?: number;
 }
 
 const PCT: number[] = [0, 1, 0.97, 0.94, 0.92, 0.89, 0.86, 0.83, 0.81, 0.78, 0.75, 0.73, 0.71, 0.7, 0.68, 0.67, 0.65, 0.64, 0.63, 0.61, 0.6,
@@ -221,7 +224,20 @@ export interface SuggestOptions {
   stack?: number[];
   /** Today's readiness check-in, average of sleep/energy/soreness on 1–5. */
   readiness?: number | null;
+  /** Training while ill or just after (ticked on the workout). */
+  illness?: Illness | null;
 }
+
+/**
+ * Post-illness mode. A cold with symptoms only above the neck: train lighter. After a fever or the flu, strength
+ * and heat tolerance are down for a while and the heart works harder, so go clearly lighter with less volume.
+ * Both stop well short of failure (3+ reps in reserve): effort is what costs recovery, and the immune system is
+ * still busy. The level comes back within a few normal sessions, so these sessions never count as a drop.
+ */
+export const ILLNESS: Record<Illness, { pct: number; rir: number; dropSets: number; label: string }> = {
+  mild: { pct: 0.9, rir: 3, dropSets: 0, label: 'Mild (cold, no fever)' },
+  flu: { pct: 0.8, rir: 3, dropSets: 1, label: 'After fever or flu' },
+};
 
 /** Next real weight above `w` on a stack, else `w + step`. */
 export function nextOnStack(w: number, stack: number[] | undefined, step: number): number {
@@ -242,7 +258,9 @@ export function rampFor(daysOff: number): { sessions: number; startPct: number }
 export function suggest(sessions: Session[], type: ExerciseType, equip: string, nowSec: number, opts: SuggestOptions = {}): Suggestion | null {
   const fw = opts.fw ?? (kg => `${trim(kg)} kg`);
   const prior = opts.prior ?? DEFAULT_RATE;
-  const done = sessions.filter(s => working(s.ex.sets).length);
+  // Sessions done while ill say nothing about your real level, so they're left out (unless that's all there is).
+  const healthy = sessions.filter(s => !s.illness && working(s.ex.sets).length);
+  const done = healthy.length ? healthy : sessions.filter(s => working(s.ex.sets).length);
   if (!done.length) return null;
   const last = done[done.length - 1];
   const lastWork = working(last.ex.sets);
@@ -250,7 +268,10 @@ export function suggest(sessions: Session[], type: ExerciseType, equip: string, 
   const gapDays = typicalGap(done);
   const base = { lastDate: last.start, sessions: done.length, gapDays };
 
-  if (type !== 'weight_reps') return simpleSuggest(done, type, lastWork, daysOff, base);
+  if (type !== 'weight_reps') {
+    const simple = simpleSuggest(done, type, lastWork, daysOff, base);
+    return opts.illness ? easeSimple(simple, opts.illness) : simple;
+  }
 
   const streak = currentStreak(done);
   const stack = opts.stack?.length ? [...opts.stack].sort((a, b) => a - b) : undefined;
@@ -295,6 +316,26 @@ export function suggest(sessions: Session[], type: ExerciseType, equip: string, 
       ? { kg, reps: Math.max(1, reps - drop), sec: null, side: s.side }
       : { kg: s.kg, reps: s.reps, sec: null, side: s.side };
   });
+
+  // Post-illness mode: lighter than your normal level (not than a plan that may add weight), well short of failure.
+  if (opts.illness) {
+    const il = ILLNESS[opts.illness];
+    const ease = (kg: number) => floorOnStack(kg * il.pct, stack, learned);
+    const kg = ease(W);
+    // When the machine has no lighter weight, cut reps instead.
+    const reps = kg >= W - 1e-6 ? Math.max(1, R - (opts.illness === 'flu' ? 3 : 2)) : R;
+    const sets = targetsFor(W, R).map(t => (t.kg != null && t.kg > 0 ? { ...t, kg: ease(t.kg), reps: kg >= W - 1e-6 ? reps : t.reps } : t));
+    const fewer = il.dropSets && lastWork.length > 2 ? ` and ${il.dropSets} set fewer` : '';
+    return {
+      ...common, advice: 'easy', targetRir: il.rir, dropSets: lastWork.length > 2 ? il.dropSets : 0,
+      headline: { kg, reps, addKg: kg - W },
+      reason: (opts.illness === 'flu'
+        ? `Back after being ill: about ${Math.round((1 - il.pct) * 100)}% lighter (${fw(kg)} × ${reps})${fewer}, stopping with ${il.rir}+ reps in reserve. `
+        : `Under the weather: about ${Math.round((1 - il.pct) * 100)}% lighter (${fw(kg)} × ${reps}), stopping with ${il.rir} reps in reserve. `) +
+        `This session won't count against your progress; your normal targets (${fw(W)} × ${R}) are waiting when you feel well.`,
+      sets,
+    };
+  }
 
   // Return-from-break ramp: after 3+ weeks away, 2–4 sessions climb from 85–95% back to the pre-break level.
   // Works both for the first session back and for the ones after it (found from the gap in the history).
@@ -411,6 +452,18 @@ export function suggest(sessions: Session[], type: ExerciseType, equip: string, 
     reason: newSetup + `Match ${fw(W)} × ${R}. At your realistic pace (~${pctWk}, slowing over time) the next step, ` +
       `${next ? `${fw(next.kg)} × ${next.reps}` : 'one more rep'}, is due ${next ? when(next.weeks) : 'later'}. Try for it when a set feels easy.`,
     sets: targetsFor(W, R),
+  };
+}
+
+/** Post-illness mode for exercises without a weight × reps target: fewer reps or shorter time. */
+function easeSimple(s: Suggestion, illness: Illness): Suggestion {
+  const il = ILLNESS[illness];
+  const cut = (v: number | null) => (v == null ? v : Math.max(1, Math.round(v * il.pct)));
+  return {
+    ...s, advice: 'easy', targetRir: il.rir, dropSets: s.sets.length > 2 ? il.dropSets : 0,
+    headline: { ...s.headline, reps: cut(s.headline.reps), sec: s.headline.sec == null ? s.headline.sec : cut(s.headline.sec), addReps: undefined, addSec: undefined },
+    reason: `Going easier while ill: about ${Math.round((1 - il.pct) * 100)}% less, well short of failure. This session won't count against your progress.`,
+    sets: s.sets.map(t => ({ ...t, reps: cut(t.reps), sec: cut(t.sec) })),
   };
 }
 

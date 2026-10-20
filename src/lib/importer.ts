@@ -1,7 +1,7 @@
 // Converts between the `lait-import-v1` file (produced from Hevy, and by LAIT's own backups) and app records.
 // Later additions (sides, effort, gyms, machines, body, experiments) are optional fields, so every older file
 // still imports and every new backup still reads as v1.
-import type { BodyEntry, Exercise, ExerciseType, Experiment, Gym, Machine, Readiness, Routine, SetType, WExercise, WSet, Workout } from '../types';
+import type { BodyEntry, Exercise, ExerciseType, Experiment, Gym, Illness, Machine, Readiness, Routine, SetType, WExercise, WSet, Workout } from '../types';
 
 /** [type, kg, reps, rpe, meters, seconds, completedAt?, side?, rir?] — trailing nulls are trimmed. */
 type RawSet = [SetType, number | null, number | null, number | null, number | null, number | null, (number | null)?, ('L' | 'R' | null)?, (number | null)?];
@@ -17,7 +17,7 @@ export interface LaitFile {
   routines: { id: string; title: string; notes: string; index?: number; updated?: string | number; ex: RawEx[] }[];
   workouts: {
     id: string; name: string; desc: string; start: number; end: number; routineId: string | null; ex: RawEx[]; source?: 'hevy' | 'lait';
-    gym?: string | null; ready?: Readiness | null;
+    gym?: string | null; ready?: Readiness | null; ill?: Illness | null;
   }[];
   gyms?: Gym[];
   machines?: Machine[];
@@ -49,6 +49,7 @@ export function fromLaitFile(f: LaitFile) {
     exercises: w.ex.map(toEx), source: w.source ?? f.source,
     ...(w.gym ? { gymId: w.gym } : {}),
     ...(w.ready ? { readiness: w.ready } : {}),
+    ...(w.ill ? { illness: w.ill } : {}),
   }));
   const routines: Routine[] = f.routines.map((r, i) => ({
     id: r.id, title: r.title, notes: r.notes ?? '', order: i, exercises: r.ex.map(toEx),
@@ -79,6 +80,7 @@ export function toLaitFile(exercises: Exercise[], workouts: Workout[], routines:
       id: w.id, name: w.name, desc: w.notes, start: w.start, end: w.end, routineId: w.routineId, ex: w.exercises.map(fromEx), source: w.source,
       ...(w.gymId ? { gym: w.gymId } : {}),
       ...(w.readiness ? { ready: w.readiness } : {}),
+      ...(w.illness ? { ill: w.illness } : {}),
     })),
     ...(extras.gyms?.length ? { gyms: extras.gyms } : {}),
     ...(extras.machines?.length ? { machines: extras.machines } : {}),

@@ -1,6 +1,6 @@
 // Pure workout maths: 1RM, volume, PR detection and the per-exercise history index.
 // No runtime imports, so it runs under plain `node --test` as well as in the app.
-import type { Exercise, ExerciseType, PRType, WExercise, WSet, Workout } from '../types';
+import type { Exercise, ExerciseType, Illness, PRType, WExercise, WSet, Workout } from '../types';
 
 /** Hevy's %-of-1RM table (reps -> fraction). Anything above 30 reps uses 50%. */
 const PCT: Record<number, number> = {
@@ -77,6 +77,8 @@ export interface Session {
   start: number;
   /** Gym of the workout (null for imported Hevy history). */
   gymId: string | null;
+  /** Set when the workout was marked as done while ill or just after. */
+  illness?: Illness | null;
   ex: WExercise;
   /** PRs keyed by set index within ex.sets. */
   prs: Map<number, SetPR[]>;
@@ -135,7 +137,7 @@ export function buildHistory(workouts: Workout[], types: Map<string, ExerciseTyp
       records.set(ex.exId, rec);
       if (setPrs.size) wMap.set(ei, setPrs);
       const list = byExercise.get(ex.exId) ?? [];
-      list.push({ workoutId: w.id, workoutName: w.name, start: w.start, gymId: w.gymId ?? null, ex, prs: setPrs });
+      list.push({ workoutId: w.id, workoutName: w.name, start: w.start, gymId: w.gymId ?? null, illness: w.illness ?? null, ex, prs: setPrs });
       byExercise.set(ex.exId, list);
     });
     prCount.set(w.id, count);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Exercise, Prefs, SetType, WExercise, WSet } from '../types';
+import type { Exercise, Illness, Prefs, SetType, WExercise, WSet } from '../types';
 import { usesDistance, usesDuration, usesReps, usesWeight } from '../lib/stats';
 import { clock, dUnit, fromD, fromW, toD, toW, wUnit } from '../lib/format';
 import { newSet } from '../lib/actions';
@@ -75,6 +75,8 @@ interface Props {
   gymId?: string | null;
   /** Today's readiness score (1–5), if checked in. */
   readiness?: number | null;
+  /** Post-illness mode of the workout. */
+  illness?: Illness | null;
   /** Show the next-session suggestion strip (off when editing a past workout). */
   showSuggestion?: boolean;
   /** Show the RIR (reps in reserve) column. Defaults to on while logging. */
@@ -106,7 +108,7 @@ function SetRow({ children, onSwipe, className, style }: { children: React.React
   return <div className={className} style={style} {...swipe}>{children}</div>;
 }
 
-export function ExerciseCard({ ex, exercise, prefs, previous, mode, supersetLabel, gymId = null, readiness = null, showSuggestion = true, rirInput, onChange, onRemove, onMove, onToggleSuperset, onSetDone }: Props) {
+export function ExerciseCard({ ex, exercise, prefs, previous, mode, supersetLabel, gymId = null, readiness = null, illness = null, showSuggestion = true, rirInput, onChange, onRemove, onMove, onToggleSuperset, onSetDone }: Props) {
   const { history, machines, exercises } = useData();
   const t = exercise?.type ?? 'weight_reps';
   const [menu, setMenu] = useState(false);
@@ -128,7 +130,7 @@ export function ExerciseCard({ ex, exercise, prefs, previous, mode, supersetLabe
   const prevAt = (i: number) => previousFor(previous, i, !!ex.uni);
   const labels = setLabels(ex.sets);
   const rest = effectiveRest(ex, prefs.defaultRest);
-  const sugg = useSuggestion(ex.exId, { gymId, readiness });
+  const sugg = useSuggestion(ex.exId, { gymId, readiness, illness });
   const allDone = ex.sets.length > 0 && ex.sets.every(s => s.done);
   const weighted = t === 'weight_reps' || t === 'bodyweight_reps' || t === 'weight_duration';
 

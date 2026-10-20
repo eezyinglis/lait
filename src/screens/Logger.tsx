@@ -4,7 +4,8 @@ import { getActive, setActive } from '../db';
 import { discardWorkout, finishWorkout, updateRoutineFromWorkout } from '../lib/actions';
 import { buildHistory, countSets, previousSets, workoutVolume } from '../lib/stats';
 import { clock, fmtDuration, fmtVolume, PR_LABEL } from '../lib/format';
-import type { ActiveWorkout, Readiness, Workout } from '../types';
+import type { ActiveWorkout, Illness, Readiness, WExercise, Workout } from '../types';
+import { ILLNESS } from '../lib/overload';
 import { readinessScore } from '../lib/training';
 import { GymPicker } from '../components/Gym';
 import { runBackup } from '../components/Banners';
@@ -18,10 +19,11 @@ import { keepScreenOn } from '../lib/device';
 
 export function Logger() {
   const data = useData();
-  const { active, exercises, history, prefs, types, gyms } = data;
+  const { active, exercises, history, prefs, types, gyms, routines } = data;
   const [w, setW] = useState<ActiveWorkout | null>(active);
   const [picker, setPicker] = useState(false);
   const [gymOpen, setGymOpen] = useState(false);
+  const [illOpen, setIllOpen] = useState(false);
   const [confirm, setConfirm] = useState<'finish' | 'discard' | null>(null);
   const [done, setDone] = useState<Workout | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -77,8 +79,8 @@ export function Logger() {
       autofilled: true,
       exercises: w.exercises.map(e => {
         if (e.auto || e.sets.some(s => s.done)) return e;
-        const s = suggestionFor(data, e.exId, w.gymId ?? null, r);
-        return { ...(s ? applyTargets(e, s.sets) : e), auto: true };
+        const s = suggestionFor(data, e.exId, w.gymId ?? null, r, w.illness ?? null);
+        return { ...(s ? dropSets(applyTargets(e, s.sets), s.dropSets ?? 0) : e), auto: true };
       }),
     });
   }, [w, prefs.autoFill, prefs.readinessCheck, data.history]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -99,6 +101,20 @@ export function Logger() {
   const vol = workoutVolume({ exercises: w.exercises.map(e => ({ ...e, sets: e.sets.filter(s => s.done) })) }, types, prefs.volumeIncludesWarmups);
 
   const onSetDone = (secs: number) => startRest(secs);
+  /** Turns post-illness mode on/off: exercises not started yet get their targets again (sets an earlier setting left out come back). */
+  const setIllness = (ill: Illness | null) => {
+    const routine = routines.find(x => x.id === w.routineId);
+    update({
+      ...w, illness: ill,
+      exercises: w.exercises.map(e => {
+        if (e.sets.some(s => s.done)) return e;
+        const orig = routine?.exercises.find(x => x.exId === e.exId);
+        const base = orig && orig.sets.length > e.sets.length ? { ...e, sets: orig.sets.map(s => ({ ...s })) } : e;
+        return { ...base, auto: false };
+      }),
+    });
+    setIllOpen(false);
+  };
   const ready = readinessScore(w.readiness);
   const gymName = gyms.find(g => g.id === w.gymId)?.name;
   // Previous values come from the same gym's machine when you've used it there before.
@@ -130,6 +146,9 @@ export function Logger() {
         <input className="title-input" value={w.name} onChange={e => update({ ...w, name: e.target.value })} aria-label="Workout name" />
         <button className="gym-chip" onClick={() => setGymOpen(true)}><Icon name="home" size={14} /> {gymName ?? 'Choose gym'}</button>
         {ready != null && <span className={'ready-chip' + (ready <= 2.5 ? ' low' : '')}>Readiness {ready.toFixed(1)}/5</span>}
+        <button className={'ill-chip' + (w.illness ? ' on' : '')} onClick={() => setIllOpen(true)}>
+          ♡ {w.illness ? `After illness: ${w.illness === 'flu' ? 'fever/flu' : 'mild'}` : 'After illness?'}
+        </button>
         <div className="log-stats">
           <div><span>Duration</span><b className="accent">{clock((now / 1000) - w.start)}</b></div>
           <div><span>Volume</span><b>{fmtVolume(vol, prefs)}</b></div>
@@ -151,7 +170,7 @@ export function Logger() {
 
       {w.exercises.map((ex, i) => (
         <ExerciseCard key={i + ex.exId} ex={ex} exercise={exercises.get(ex.exId)} prefs={prefs} mode="log"
-          previous={previousAt(ex.exId)} supersetLabel={labels[i]} gymId={w.gymId ?? null} readiness={ready}
+          previous={previousAt(ex.exId)} supersetLabel={labels[i]} gymId={w.gymId ?? null} readiness={ready} illness={w.illness ?? null}
           onChange={e => ops.change(i, e)} onRemove={() => ops.remove(i)} onMove={d => ops.move(i, d)}
           onToggleSuperset={() => ops.toggleSuperset(i)} onSetDone={onSetDone} />
       ))}
@@ -163,6 +182,22 @@ export function Logger() {
 
       <ExercisePicker open={picker} onClose={() => setPicker(false)} onPick={ids => ops.add(ids)} />
       <GymPicker open={gymOpen} onClose={() => setGymOpen(false)} value={w.gymId ?? null} onPick={id => update({ ...w, gymId: id })} />
+
+      <Sheet open={illOpen} onClose={() => setIllOpen(false)} title="Post-illness mode">
+        <div className="menu">
+          <p className="muted pad">Today's plan goes easier and this workout won't count against your progress or trigger a deload warning.</p>
+          {(Object.keys(ILLNESS) as Illness[]).map(k => (
+            <button key={k} className={'menu-i' + (w.illness === k ? ' sel' : '')} onClick={() => setIllness(k)}>
+              <span className="grow">{ILLNESS[k].label}<br /><span className="muted small">
+                ~{Math.round((1 - ILLNESS[k].pct) * 100)}% lighter · stop at {ILLNESS[k].rir}+ RIR{ILLNESS[k].dropSets ? ` · ${ILLNESS[k].dropSets} set fewer per exercise` : ''}
+              </span></span>
+              {w.illness === k && <span className="accent">✓</span>}
+            </button>
+          ))}
+          <button className="menu-i" onClick={() => setIllness(null)}><span className="grow">I'm healthy (normal plan)</span>{!w.illness && <span className="accent">✓</span>}</button>
+          <p className="muted small pad">Fever, chest symptoms or body aches: rest instead. Train again once you've been fever-free for a day or two.</p>
+        </div>
+      </Sheet>
 
       <Sheet open={confirm === 'finish'} onClose={() => setConfirm(null)} title="Finish workout?">
         <div className="menu">
@@ -187,6 +222,17 @@ export function Logger() {
       </Sheet>
     </div>
   );
+}
+
+/** Leaves out the last `n` working sets that aren't ticked yet (L/R pairs count as one), keeping at least one. */
+function dropSets(e: WExercise, n: number): WExercise {
+  if (n <= 0) return e;
+  const per = e.uni ? 2 : 1;
+  const working = e.sets.filter(s => s.type !== 'warmup').length;
+  let left = Math.max(0, Math.min(n * per, working - per));
+  const sets = [...e.sets];
+  for (let i = sets.length - 1; i >= 0 && left > 0; i--) if (sets[i].type !== 'warmup' && !sets[i].done) { sets.splice(i, 1); left--; }
+  return { ...e, sets };
 }
 
 function Summary({ w }: { w: Workout }) {

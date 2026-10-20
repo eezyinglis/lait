@@ -30,6 +30,7 @@ export function WorkoutDetail({ id }: { id: string }) {
       <div className="detail-top">
         <h1>{w.name}</h1>
         <div className="muted">{fmtDate(w.start)} · {time}</div>
+        {w.illness && <span className="ill-tag">♡ After illness ({w.illness === 'flu' ? 'fever/flu' : 'mild'}): doesn't count against progress</span>}
         {w.notes && <p className="wnotes">{w.notes}</p>}
         <div className="stats4">
           <div><span>Duration</span><b>{fmtDuration(w.end - w.start)}</b></div>

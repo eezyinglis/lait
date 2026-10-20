@@ -5,25 +5,25 @@ import { suggest, type Advice, type SetTarget, type Suggestion } from '../lib/ov
 import { effectiveStack, learnStack } from '../lib/training';
 import { machineId } from '../db';
 import { clock, num, toW, wUnit } from '../lib/format';
-import type { Prefs, WExercise } from '../types';
+import type { Illness, Prefs, WExercise } from '../types';
 import { Icon } from './ui';
 
 /**
  * Suggestion for one exercise, paced by your personal long-run rate. At a known gym it compares only sessions
  * from that gym (when there are at least 2) and jumps along that machine's real weight stack.
  */
-export function useSuggestion(exId: string, ctx: { gymId?: string | null; readiness?: number | null } = {}): Suggestion | null {
+export function useSuggestion(exId: string, ctx: { gymId?: string | null; readiness?: number | null; illness?: Illness | null } = {}): Suggestion | null {
   const data = useData();
   const gymId = ctx.gymId === undefined ? data.currentGym : ctx.gymId;
   const machine = gymId ? data.machines.get(machineId(gymId, exId)) : undefined;
-  return useMemo(() => suggestionFor(data, exId, gymId, ctx.readiness ?? null),
-    [data.history, data.exercises, exId, data.prefs, data.overloadPrior, gymId, machine, ctx.readiness]); // eslint-disable-line react-hooks/exhaustive-deps
+  return useMemo(() => suggestionFor(data, exId, gymId, ctx.readiness ?? null, ctx.illness ?? null),
+    [data.history, data.exercises, exId, data.prefs, data.overloadPrior, gymId, machine, ctx.readiness, ctx.illness]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 type SuggestData = Pick<ReturnType<typeof useData>, 'history' | 'exercises' | 'prefs' | 'overloadPrior' | 'machines'>;
 
 /** Same as useSuggestion, callable outside render (e.g. to fill a whole workout at once). */
-export function suggestionFor(d: SuggestData, exId: string, gymId: string | null, readiness: number | null): Suggestion | null {
+export function suggestionFor(d: SuggestData, exId: string, gymId: string | null, readiness: number | null, illness: Illness | null = null): Suggestion | null {
   const ex = d.exercises.get(exId);
   const all = d.history.byExercise.get(exId);
   if (!ex || !all?.length) return null;
@@ -32,7 +32,7 @@ export function suggestionFor(d: SuggestData, exId: string, gymId: string | null
   const sessions = atGym.length >= 2 ? atGym : all;
   const stack = effectiveStack(machine?.weights, gymId ? learnStack(all, gymId) : []);
   return suggest(sessions, ex.type, ex.equip, Date.now() / 1000, {
-    prior: d.overloadPrior, stack, readiness,
+    prior: d.overloadPrior, stack, readiness, illness,
     fw: kg => `${num(toW(kg, d.prefs), 2)} ${wUnit(d.prefs)}`,
   });
 }
@@ -43,6 +43,7 @@ export const ADVICE: Record<Advice, { label: string; cls: string; icon: string }
   hold: { label: 'Match it', cls: 'adv-hold', icon: '=' },
   plateau: { label: 'Plateau', cls: 'adv-plateau', icon: '≈' },
   return: { label: 'Ease back in', cls: 'adv-return', icon: '↺' },
+  easy: { label: 'Easy: after illness', cls: 'adv-easy', icon: '♡' },
 };
 
 /** Advice label; several reps at once only happens when returning to your level after an off day. */
@@ -113,6 +114,7 @@ export function SuggestionStrip({ s, onApply }: { s: Suggestion; onApply: () => 
           {adviceLabel(s)}
           {s.advice === 'hold' && !(s.headline.addKg && s.headline.addKg < 0) && next && next.weeks > 0.3 &&
             ` · next: ${num(toW(next.kg, prefs), 2)}×${next.reps} ${fmtWeeks(next.weeks)}`}
+          {s.targetRir != null && ` · stop at ${s.targetRir} RIR`}
         </span>
       </span>
       <button className="btn sm sugg-apply" onClick={onApply}>Apply</button>

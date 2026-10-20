@@ -54,7 +54,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const history = useMemo(() => buildHistory(workouts ?? [], types), [workouts, types]);
   const overloadPrior = useMemo(() => personalRate(history.byExercise.values()), [history]);
   const machines = useMemo(() => new Map((machineList ?? []).map(m => [m.id, m])), [machineList]);
-  const recoveryCal = useMemo(() => calibrate(workouts ?? [], exercises), [workouts, exercises]);
+  const recoveryCal = useMemo(() => calibrate((workouts ?? []).filter(w => !w.illness), exercises), [workouts, exercises]);
 
   // Plateau experiments are scored automatically once 3 weeks have passed and the lift was done again.
   useEffect(() => {

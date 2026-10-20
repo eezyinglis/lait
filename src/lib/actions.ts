@@ -64,6 +64,7 @@ export async function finishWorkout(a: ActiveWorkout): Promise<Workout | null> {
   const w: Workout = {
     id: a.id, name: a.name.trim() || 'Workout', notes: a.notes, start: a.start, end: nowSec(),
     routineId: a.routineId, exercises, source: 'lait', gymId: a.gymId ?? null, readiness: a.readiness ?? null,
+    ...(a.illness ? { illness: a.illness } : {}),
   };
   await db.transaction('rw', db.workouts, db.kv, async () => {
     await db.workouts.put(w);
